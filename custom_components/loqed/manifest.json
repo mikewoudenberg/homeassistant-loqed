@@ -1,0 +1,14 @@
+{
+  "domain": "loqed",
+  "name": "Loqed",
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/loqed",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": [{ "type": "_http._tcp.local.", "name": "LOQED*" }],
+  "homekit": {},
+  "dependencies": ["zeroconf", "webhook"],
+  "codeowners": ["@mikewoudenberg"],
+  "iot_class": "local_push",
+  "version": "0.0.1"
+}

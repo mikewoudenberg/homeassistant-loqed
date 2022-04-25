@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "The Loqed integration uses a combination of a webhook and connection to the bridge",
+        "data": {
+          "ip_address": "[%key:common::config_flow::data::ip%]",
+          "api_key": "[%key:common::config_flow::data::api_key%]",
+          "client_secret": "Incoming webhook API key",
+          "client_id": "Incoming webhook API key local key id"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  }
+}
