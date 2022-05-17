@@ -3,7 +3,14 @@ from __future__ import annotations
 import json
 import logging
 
-from .loqed import LoqedLockClient, LoqedWebhookClient
+from aiohttp import ClientTimeout
+
+from .loqed import (
+    WEBHOOK_ALL_EVENTS_FLAG,
+    LoqedLockClient,
+    LoqedStatusClient,
+    LoqedWebhookClient,
+)
 from aiohttp.web import Request
 
 from homeassistant.helpers.network import get_url
@@ -49,6 +56,30 @@ async def handle_webhook(hass: HomeAssistant, _: str, request: Request):
     async_dispatcher_send(hass, SENSOR_UPDATE, message)
 
 
+async def ensure_webhooks(
+    hass: HomeAssistant, webhook_id: str, webhook_client: LoqedWebhookClient
+) -> int:
+    """
+    Ensures the existence of the webhooks on both sides
+    """
+
+    webhook.async_register(hass, DOMAIN, "Loqed", webhook_id, handle_webhook)
+    webhook_url = webhook.async_generate_url(hass, webhook_id)
+    _LOGGER.info("Webhook URL: %s", webhook_url)
+
+    webhooks = await webhook_client.get_all_webhooks("")
+    webhook_index = next((x["id"] for x in webhooks if x["url"] == webhook_url), None)
+
+    if not webhook_index:
+        await webhook_client.setup_webhook("", webhook_url, WEBHOOK_ALL_EVENTS_FLAG)
+        webhooks = await webhook_client.get_all_webhooks("")
+        webhook_index = next(x["id"] for x in webhooks if x["url"] == webhook_url)
+
+        _LOGGER.info("Webhook got index %s", webhook_index)
+
+    return int(webhook_index)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Loqed from a config entry."""
     entry_config = {}
@@ -63,6 +94,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         websession, entry.data[CONF_IP_ADDRESS], entry.data[CONF_API_KEY]
     )
 
+    webhook_index = await ensure_webhooks(hass, webhook_id, webhook_client)
+
     lock_client = LoqedLockClient(
         websession,
         entry.data[CONF_IP_ADDRESS],
@@ -70,26 +103,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_CLIENT_SECRET],
     )
 
-    webhook.async_register(hass, DOMAIN, "Loqed", webhook_id, handle_webhook)
-
-    webhook_url = "{}{}".format(
-        get_url(hass, allow_cloud=False),
-        webhook.async_generate_path(webhook_id),
-    )
-    _LOGGER.info("Webhook URL: %s", webhook_url)
-
-    webhooks = await webhook_client.get_all_webhooks("")
-    webhook_id = next((x["id"] for x in webhooks if x["url"] == webhook_url), None)
-    if not webhook_id:
-        await webhook_client.setup_webhook("", webhook_url, 511)
-        webhooks = await webhook_client.get_all_webhooks("")
-        webhook_id = next(x["id"] for x in webhooks if x["url"] == webhook_url)
-
-        _LOGGER.info("Webhook got id %s", webhook_id)
+    status_client = LoqedStatusClient(websession, entry.data[CONF_IP_ADDRESS])
 
     entry_config["client"] = webhook_client
     entry_config["lock_client"] = lock_client
-    entry_config["webhook_id"] = int(webhook_id)
+    entry_config["webhook_id"] = webhook_index
+    entry_config["status_client"] = status_client
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 

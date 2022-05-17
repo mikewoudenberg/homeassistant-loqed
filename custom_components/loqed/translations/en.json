@@ -1,23 +1,21 @@
 {
-  "config": {
-    "abort": {
-      "already_configured": "Device is already configured"
-    },
-    "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
-    },
-    "step": {
-      "user": {
-        "description": "The Loqed integration uses a combination of a webhook and connection to the bridge",
-        "data": {
-          "ip_address": "Ip adress of bridge",
-          "api_key": "Api key of bridge",
-          "client_secret": "Incoming webhook API key",
-          "client_id": "Incoming webhook API key local key id"
+    "config": {
+        "abort": {
+            "already_configured": "Device is already configured"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Unexpected error"
+        },
+        "step": {
+            "user": {
+                "description": "The Loqed integration uses a combination of a webhook and connection to the bridge",
+                "data": {
+                    "ip_address": "Ip adress of bridge",
+                    "api_key": "Api key of bridge"
+                }
+            }
         }
-      }
     }
-  }
 }

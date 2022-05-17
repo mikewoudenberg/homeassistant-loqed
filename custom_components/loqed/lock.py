@@ -4,13 +4,13 @@ Lock platform for Loqed
 import logging
 from typing import Any
 
-from .loqed import LoqedLockClient
+from .loqed import LoqedLockClient, LoqedStatusClient
 from . import SENSOR_UPDATE
 
 from .const import DOMAIN
 
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.components.lock import LockEntity, SUPPORT_OPEN
+from homeassistant.components.lock import LockEntity, LockEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_MAC,
@@ -49,9 +49,17 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Loqed sensor."""
+    status_client: LoqedStatusClient = hass.data[DOMAIN]["status_client"]
+    state = await status_client.get_lock_status("")
 
-    entities = [LoqedLock(entry.data[CONF_MAC], hass.data[DOMAIN]["lock_client"])]
-    async_add_entities(entities, True)
+    entities = [
+        LoqedLock(
+            entry.data[CONF_MAC],
+            hass.data[DOMAIN]["lock_client"],
+            LOCK_MESSAGE_STATE_TO_STATUS.get(state.bolt_state, STATE_UNKNOWN),
+        )
+    ]
+    async_add_entities(entities)
 
 
 class LoqedLock(RestoreEntity, LockEntity):
@@ -60,12 +68,14 @@ class LoqedLock(RestoreEntity, LockEntity):
     """
 
     _attr_name = "Loqed Lock status"
-    _attr_supported_features = SUPPORT_OPEN
+    _attr_supported_features = LockEntityFeature.OPEN
     _attr_should_poll = False
 
-    def __init__(self, mac_address: str, client: LoqedLockClient) -> None:
+    def __init__(
+        self, mac_address: str, client: LoqedLockClient, initial_state: str
+    ) -> None:
         self._client = client
-        self._state = STATE_UNKNOWN
+        self._state = initial_state
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, mac_address)},
             name="Loqed instance",

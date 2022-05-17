@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 import base64
+from dataclasses import dataclass
+from enum import Enum
 from hashlib import sha256
+import hashlib
+import hmac
 import json
 import logging
+import struct
 from time import time
+from types import SimpleNamespace
 from aiohttp import ClientSession
+import urllib
 
-DEFAULT_TIMEOUT = 3
+DEFAULT_TIMEOUT = 5 * 60
 TIMESTAMP_HEADER_NAME = "timestamp"
 HASH_HEADER_NAME = "hash"
 ALLOWED_DRIFT = 60
+WEBHOOK_ALL_EVENTS_FLAG = 511
 
 
 def _now_as_timestamp():
@@ -19,6 +27,16 @@ def _now_as_timestamp():
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class ActionType(Enum):
+    """
+    Represents an action that can be taken by the lock
+    """
+
+    OPEN = 1
+    UNLOCK = 2
+    LOCK = 3
 
 
 class LoqedWebhookClient:
@@ -37,12 +55,14 @@ class LoqedWebhookClient:
         :param ip_address: ip address of your loqed bridge
         :param api_key: base64 encoded key of your bridge
         """
-        self.__session = session
-        self.__ip_address = ip_address
-        self.__api_key = api_key
-        self.__timeout = timeout
+        self._session = session
+        self._ip_address = ip_address
+        self._api_key = api_key
+        self._timeout = timeout
 
-    async def setup_webhook(self, lock_id, callback_url: str, flags: int):
+    async def setup_webhook(
+        self, lock_id, callback_url: str, flags: int = WEBHOOK_ALL_EVENTS_FLAG
+    ):
         """
         Sets up a webhook for the given lock. Enables all events and calls the callbackUrl
         """
@@ -50,9 +70,9 @@ class LoqedWebhookClient:
         signature = self._generate_signature(
             callback_url.encode() + flags.to_bytes(4, "big"), now
         )
-        result = await self.__session.post(
-            f"http://{self.__ip_address}/webhooks",
-            timeout=self.__timeout,
+        result = await self._session.post(
+            f"http://{self._ip_address}/webhooks",
+            timeout=self._timeout,
             headers={"timestamp": str(now), "hash": signature},
             json={
                 "url": callback_url,
@@ -78,9 +98,9 @@ class LoqedWebhookClient:
         """
         now = _now_as_timestamp()
         signature = self._generate_signature(webhook_id.to_bytes(8, "big"), now)
-        result = await self.__session.delete(
-            f"http://{self.__ip_address}/webhooks/{webhook_id}",
-            timeout=self.__timeout,
+        result = await self._session.delete(
+            f"http://{self._ip_address}/webhooks/{webhook_id}",
+            timeout=self._timeout,
             headers={"timestamp": str(now), "hash": signature},
         )
 
@@ -94,9 +114,9 @@ class LoqedWebhookClient:
         """
         now = _now_as_timestamp()
         signature = self._generate_signature(bytes(), now)
-        result = await self.__session.get(
-            f"http://{self.__ip_address}/webhooks",
-            timeout=self.__timeout,
+        result = await self._session.get(
+            f"http://{self._ip_address}/webhooks",
+            timeout=self._timeout,
             headers={"timestamp": str(now), "hash": signature},
         )
 
@@ -129,7 +149,7 @@ class LoqedWebhookClient:
         Returns the signature for the requested message
         """
         return sha256(
-            body + timestamp.to_bytes(8, "big") + base64.b64decode(self.__api_key)
+            body + timestamp.to_bytes(8, "big") + base64.b64decode(self._api_key)
         ).hexdigest()
 
 
@@ -141,45 +161,118 @@ class LoqedLockClient:
     def __init__(
         self, session: ClientSession, ip_address: str, local_key_id: int, secret: str
     ) -> None:
-        self.__session = session
-        self.__ip_address = ip_address
-        self.__local_key_id = local_key_id
-        self.__secret = secret
+        self._session = session
+        self._ip_address = ip_address
+        self._local_key_id = local_key_id
+        self._secret = secret
 
     async def open_lock(self, lock_id):
         """
         Open the provided lock
         """
-        result = await self.__session.get(
-            f"http://{self.__ip_address}/state?command=OPEN&local_key_id={self.__local_key_id}&secret={self.__secret}"
+        result = await self._session.get(
+            f"http://{self._ip_address}/to_lock?command_signed_base64={self._get_command(ActionType.OPEN)}"
         )
-        return result.status == 200
+        result.raise_for_status()
 
     async def lock_lock(self, lock_id):
         """
         Locks the provided lock
         """
-        result = await self.__session.get(
-            f"http://{self.__ip_address}/state?command=NIGHT_LOCK&local_key_id={self.__local_key_id}&secret={self.__secret}"
+        result = await self._session.get(
+            f"http://{self._ip_address}/to_lock?command_signed_base64={self._get_command(ActionType.LOCK)}"
         )
-        return result.status == 200
+        result.raise_for_status()
 
     async def latch_lock(self, lock_id):
         """
         Locks the provided lock
         """
-        result = await self.__session.get(
-            f"http://{self.__ip_address}/state?command=DAY_LOCK&local_key_id=2&secret=Bs2Yhh6Tr%2BCPrC70DL9JI0LEm%2B0RRMUEAxXCK1l4JdA%3D"
+        result = await self._session.get(
+            f"http://{self._ip_address}/to_lock?command_signed_base64={self._get_command(ActionType.UNLOCK)}"
         )
-        return result.status == 200
+        result.raise_for_status()
 
-    async def get_lock_status(self, lock_id):
+    def _get_command(self, action: ActionType):
+        """
+        Generates a signed comamnd string that can be sent to the lock securely
+        """
+        message_id = 0
+        protocol = 2
+        command_type = 7
+        device_id = 1
+        message_id_bin = struct.pack("Q", message_id)
+        protocol_bin = struct.pack("B", protocol)
+        command_type_bin = struct.pack("B", command_type)
+        local_key_id_bin = struct.pack("B", self._local_key_id)
+        device_id_bin = struct.pack("B", device_id)
+        action_bin = struct.pack("B", action.value)
+        now = int(time())
+        timenow_bin = now.to_bytes(8, "big", signed=False)
+        local_generated_binary_hash = (
+            protocol_bin
+            + command_type_bin
+            + timenow_bin
+            + local_key_id_bin
+            + device_id_bin
+            + action_bin
+        )
+        command_hmac = hmac.new(
+            base64.b64decode(self._secret), local_generated_binary_hash, hashlib.sha256
+        ).digest()
+        command = (
+            message_id_bin
+            + protocol_bin
+            + command_type_bin
+            + timenow_bin
+            + command_hmac
+            + local_key_id_bin
+            + device_id_bin
+            + action_bin
+        )
+        return urllib.parse.quote(base64.b64encode(command).decode("ascii"))
+
+
+class LoqedStatusClient:
+    """
+    Client for retrieving status the Loqed bridge
+    """
+
+    def __init__(self, session: ClientSession, ip_address: str) -> None:
+        self._session = session
+        self._ip_address = ip_address
+
+    async def get_lock_status(self, lock_id) -> BridgeStatus:
         """
         Gets the status of the provided lock
         """
-        result = await self.__session.get(f"http://{self.__ip_address}/status")
-        body = await result.text()
-        return json.loads(body)
+        result = await self._session.get(f"http://{self._ip_address}/status")
+        return await result.json(
+            content_type="text/html",
+            loads=lambda v: json.loads(v, object_hook=lambda d: SimpleNamespace(**d)),
+        )
+
+
+@dataclass
+class BridgeStatus:
+    """
+    Represents the status of the lock
+    """
+
+    battery_percentage: int
+    battery_type: str
+    battery_type_numeric: int
+    battery_voltage: int
+    bolt_state: str
+    bolt_state_numeric: int
+    bridge_mac_wifi: str
+    bridge_mac_ble: str
+    lock_online: int
+    webhooks_number: int
+    ip_address: str
+    up_timestamp: int
+    wifi_strength: int
+    ble_strength: int
 
 
 class LoqedException(Exception):

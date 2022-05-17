@@ -2,34 +2,64 @@
 Loqed sensor entities
 """
 from __future__ import annotations
-import logging
 
-from .const import DOMAIN
-from . import SENSOR_UPDATE
-
-from homeassistant.helpers.entity import DeviceInfo
+from .loqed import LoqedStatusClient
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_MAC, PERCENTAGE
+from homeassistant.const import CONF_MAC, PERCENTAGE, SIGNAL_STRENGTH_DECIBELS
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-ICON = "mdi:battery"
+from . import SENSOR_UPDATE
+from .const import DOMAIN
 
-_LOGGER = logging.getLogger(__name__)
+
+SENSORS: list[SensorEntityDescription] = [
+    SensorEntityDescription(
+        name="Loqed battery status",
+        key="battery_percentage",
+        device_class=SensorDeviceClass.BATTERY,
+        unit_of_measurement=PERCENTAGE,
+        icon="mdi:battery",
+    ),
+    SensorEntityDescription(
+        name="Loqed wifi signal strength",
+        key="wifi_strength",
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
+        icon="mdi:signal",
+    ),
+    SensorEntityDescription(
+        name="Loqed bluetooth signal strength",
+        key="ble_strength",
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
+        icon="mdi:signal",
+    ),
+]
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Loqed sensor."""
-    entities = [LoqedSensor(entry.data[CONF_MAC])]
+    status_client: LoqedStatusClient = hass.data[DOMAIN]["status_client"]
+    status = await status_client.get_lock_status("")
+
+    status_dict = vars(status)
+
+    entities = [
+        LoqedSensor(entry.data[CONF_MAC], sensor, status_dict[sensor.key])
+        for sensor in SENSORS
+    ]
     async_add_entities(entities, True)
 
 
@@ -38,13 +68,13 @@ class LoqedSensor(RestoreEntity, SensorEntity):
     Class representing a LoqedSensor
     """
 
-    _attr_name = "Loqed battery status"
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, mac_address: str) -> None:
+    def __init__(
+        self, mac_address: str, sensor_description: SensorEntityDescription, state: int
+    ) -> None:
         """
         Initializes the loqed sensor
         """
@@ -52,7 +82,10 @@ class LoqedSensor(RestoreEntity, SensorEntity):
             identifiers={(DOMAIN, mac_address)},
             name="Loqed instance",
         )
-        self._attr_unique_id = f"loqed-battery-{mac_address}"
+        self.entity_description = sensor_description
+        self._attr_unique_id = f"{sensor_description.key}-{mac_address}"
+        self._attr_native_value = state
+        self._attr_native_unit_of_measurement = sensor_description.unit_of_measurement
 
     async def async_added_to_hass(self):
         """Register callbacks."""
@@ -66,6 +99,7 @@ class LoqedSensor(RestoreEntity, SensorEntity):
 
     @callback
     def _message_callback(self, message):
-        if "battery_percentage" in message and message["mac_wifi"] in self.unique_id:
-            self._attr_native_value = int(message["battery_percentage"])
+        key = self.entity_description.key
+        if key in message and message["mac_wifi"] in self.unique_id:
+            self._attr_native_value = int(message[key])
             self.async_schedule_update_ha_state()
