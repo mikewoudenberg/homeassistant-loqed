@@ -54,11 +54,11 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             data[CONF_IP_ADDRESS],
         ).get_lock_status("")
 
-        mac = status.bridge_mac_wifi
+        mac = status["bridge_mac_wifi"]
     except Exception:  # pylint: disable=broad-except
         raise CannotConnect from Exception
 
-    return {"title": f"Loqed bridge {data[CONF_IP_ADDRESS]}", CONF_MAC: mac}
+    return {"title": "Loqed bridge", CONF_MAC: mac}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

@@ -3,7 +3,6 @@ Loqed sensor entities
 """
 from __future__ import annotations
 
-from .loqed import LoqedStatusClient
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -13,14 +12,12 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MAC, PERCENTAGE, SIGNAL_STRENGTH_DECIBELS
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import SENSOR_UPDATE
+from . import LoqedDataCoordinator
 from .const import DOMAIN
-
 
 SENSORS: list[SensorEntityDescription] = [
     SensorEntityDescription(
@@ -51,55 +48,46 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Loqed sensor."""
-    status_client: LoqedStatusClient = hass.data[DOMAIN]["status_client"]
-    status = await status_client.get_lock_status("")
-
-    status_dict = vars(status)
+    coordinator: LoqedDataCoordinator = hass.data[DOMAIN]["coordinator"]
 
     entities = [
-        LoqedSensor(entry.data[CONF_MAC], sensor, status_dict[sensor.key])
-        for sensor in SENSORS
+        LoqedSensor(entry.data[CONF_MAC], sensor, coordinator) for sensor in SENSORS
     ]
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
-class LoqedSensor(RestoreEntity, SensorEntity):
+class LoqedSensor(CoordinatorEntity[LoqedDataCoordinator], SensorEntity):
     """
     Class representing a LoqedSensor
     """
 
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_should_poll = False
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(
-        self, mac_address: str, sensor_description: SensorEntityDescription, state: int
+        self,
+        mac_address: str,
+        sensor_description: SensorEntityDescription,
+        coordinator: LoqedDataCoordinator,
     ) -> None:
         """
         Initializes the loqed sensor
         """
+        super().__init__(coordinator)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, mac_address)},
             name="Loqed instance",
         )
         self.entity_description = sensor_description
         self._attr_unique_id = f"{sensor_description.key}-{mac_address}"
-        self._attr_native_value = state
         self._attr_native_unit_of_measurement = sensor_description.unit_of_measurement
-
-    async def async_added_to_hass(self):
-        """Register callbacks."""
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SENSOR_UPDATE, self._message_callback)
-        )
-
-        if not (state := await self.async_get_last_state()):
-            return
-        self._attr_native_value = state.state
+        self._attr_native_value = coordinator.data[sensor_description.key]
 
     @callback
-    def _message_callback(self, message):
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
         key = self.entity_description.key
-        if key in message and message["mac_wifi"] in self.unique_id:
-            self._attr_native_value = int(message[key])
-            self.async_schedule_update_ha_state()
+
+        if key in self.coordinator.data:
+            self._attr_native_value = self.coordinator.data[key]
+            self.async_write_ha_state()

@@ -1,20 +1,12 @@
 """The Loqed integration."""
 from __future__ import annotations
+
 import json
 import logging
 
-from aiohttp import ClientTimeout
-
-from .loqed import (
-    WEBHOOK_ALL_EVENTS_FLAG,
-    LoqedLockClient,
-    LoqedStatusClient,
-    LoqedWebhookClient,
-)
 from aiohttp.web import Request
+import async_timeout
 
-from homeassistant.helpers.network import get_url
-from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -26,13 +18,23 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.network import get_url
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN
+from .loqed import (
+    WEBHOOK_ALL_EVENTS_FLAG,
+    LoqedException,
+    LoqedLockClient,
+    LoqedStatusClient,
+    LoqedWebhookClient,
+)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.LOCK]
 _LOGGER = logging.getLogger(__name__)
-SENSOR_UPDATE = f"{DOMAIN}_sensor_update"
 
 
 async def handle_webhook(hass: HomeAssistant, _: str, request: Request):
@@ -53,7 +55,8 @@ async def handle_webhook(hass: HomeAssistant, _: str, request: Request):
         return
 
     message = json.loads(body)
-    async_dispatcher_send(hass, SENSOR_UPDATE, message)
+    coordinator: LoqedDataCoordinator = hass.data[DOMAIN]["coordinator"]
+    coordinator.async_set_updated_data(message)
 
 
 async def ensure_webhooks(
@@ -82,12 +85,14 @@ async def ensure_webhooks(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Loqed from a config entry."""
-    entry_config = {}
-
     _LOGGER.debug("Current domain: %s", hass.data.get(DOMAIN, ""))
-    hass.data.setdefault(DOMAIN, entry_config)
+    entry_config = hass.data.setdefault(DOMAIN, {})
 
     websession = async_get_clientsession(hass)
+    status_client = LoqedStatusClient(websession, entry.data[CONF_IP_ADDRESS])
+    coordinator = LoqedDataCoordinator(hass, status_client)
+    await coordinator.async_config_entry_first_refresh()
+
     webhook_id = entry.data[CONF_WEBHOOK_ID]
 
     webhook_client = LoqedWebhookClient(
@@ -103,12 +108,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_CLIENT_SECRET],
     )
 
-    status_client = LoqedStatusClient(websession, entry.data[CONF_IP_ADDRESS])
-
     entry_config["client"] = webhook_client
     entry_config["lock_client"] = lock_client
     entry_config["webhook_id"] = webhook_index
-    entry_config["status_client"] = status_client
+    entry_config["coordinator"] = coordinator
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 
@@ -126,3 +129,25 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN] = None
 
     return unload_ok
+
+
+class LoqedDataCoordinator(DataUpdateCoordinator):
+    """
+    Data update coordinator for the loqed platform
+    """
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        status_client: LoqedStatusClient,
+    ) -> None:
+        super().__init__(hass, _LOGGER, name="Loqed sensors")
+        self.status_client = status_client
+
+    async def _async_update_data(self):
+        """Fetch data from API endpoint."""
+        try:
+            async with async_timeout.timeout(10):
+                return await self.status_client.get_lock_status("")
+        except LoqedException as err:
+            raise ConfigEntryAuthFailed from err

@@ -1,19 +1,19 @@
 """API wrapper for Loqed integration."""
 
 from __future__ import annotations
+
 import base64
-from dataclasses import dataclass
 from enum import Enum
-from hashlib import sha256
 import hashlib
+from hashlib import sha256
 import hmac
 import json
 import logging
 import struct
 from time import time
-from types import SimpleNamespace
-from aiohttp import ClientSession
 import urllib
+
+from aiohttp import ClientSession
 
 DEFAULT_TIMEOUT = 5 * 60
 TIMESTAMP_HEADER_NAME = "timestamp"
@@ -242,37 +242,14 @@ class LoqedStatusClient:
         self._session = session
         self._ip_address = ip_address
 
-    async def get_lock_status(self, lock_id) -> BridgeStatus:
+    async def get_lock_status(self, lock_id) -> dict[str, str]:
         """
         Gets the status of the provided lock
         """
         result = await self._session.get(f"http://{self._ip_address}/status")
         return await result.json(
             content_type="text/html",
-            loads=lambda v: json.loads(v, object_hook=lambda d: SimpleNamespace(**d)),
         )
-
-
-@dataclass
-class BridgeStatus:
-    """
-    Represents the status of the lock
-    """
-
-    battery_percentage: int
-    battery_type: str
-    battery_type_numeric: int
-    battery_voltage: int
-    bolt_state: str
-    bolt_state_numeric: int
-    bridge_mac_wifi: str
-    bridge_mac_ble: str
-    lock_online: int
-    webhooks_number: int
-    ip_address: str
-    up_timestamp: int
-    wifi_strength: int
-    ble_strength: int
 
 
 class LoqedException(Exception):
