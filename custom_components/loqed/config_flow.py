@@ -49,7 +49,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         status = await LoqedStatusClient(
             async_get_clientsession(hass),
             data[CONF_IP_ADDRESS],
-        ).get_lock_status("")
+        ).get_lock_status()
 
         mac = status["bridge_mac_wifi"]
     except Exception:  # pylint: disable=broad-except
@@ -84,8 +84,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=info["title"],
                 data=(
-                    user_input | {
-                        CONF_WEBHOOK_ID: webhook.async_generate_id()} | info
+                    user_input | {CONF_WEBHOOK_ID: webhook.async_generate_id()} | info
                 ),
             )
 

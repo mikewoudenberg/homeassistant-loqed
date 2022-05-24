@@ -61,8 +61,8 @@ class LoqedWebhookClient:
         self._timeout = timeout
 
     async def setup_webhook(
-        self, lock_id, callback_url: str, flags: int = WEBHOOK_ALL_EVENTS_FLAG
-    ):
+        self, callback_url: str, flags: int = WEBHOOK_ALL_EVENTS_FLAG
+    ) -> bool:
         """
         Sets up a webhook for the given lock. Enables all events and calls the callbackUrl
         """
@@ -92,7 +92,7 @@ class LoqedWebhookClient:
 
         return result.status == 200
 
-    async def remove_webhook(self, lock_id, webhook_id: int):
+    async def remove_webhook(self, webhook_id: int) -> bool:
         """
         Removes a webhook for the given lock.
         """
@@ -108,7 +108,7 @@ class LoqedWebhookClient:
 
         return result.status == 200
 
-    async def get_all_webhooks(self, lock_id):
+    async def get_all_webhooks(self):
         """
         Returns all webhooks
         """
@@ -130,7 +130,7 @@ class LoqedWebhookClient:
         timestamp: int,
         message_hash: str,
         allow_all_times: bool = False,
-    ):
+    ) -> bool:
         """
         Validates the given body to have come from the configured bridge
         """
@@ -144,7 +144,7 @@ class LoqedWebhookClient:
             or timestamp in range(now - ALLOWED_DRIFT, now + ALLOWED_DRIFT)
         )
 
-    def generate_signature(self, body: bytes, timestamp: int):
+    def generate_signature(self, body: bytes, timestamp: int) -> str:
         """
         Returns the signature for the requested message
         """
@@ -166,7 +166,7 @@ class LoqedLockClient:
         self._local_key_id = local_key_id
         self._secret = secret
 
-    async def open_lock(self, lock_id):
+    async def open_lock(self) -> None:
         """
         Open the provided lock
         """
@@ -175,7 +175,7 @@ class LoqedLockClient:
         )
         result.raise_for_status()
 
-    async def lock_lock(self, lock_id):
+    async def lock_lock(self) -> None:
         """
         Locks the provided lock
         """
@@ -184,7 +184,7 @@ class LoqedLockClient:
         )
         result.raise_for_status()
 
-    async def latch_lock(self, lock_id):
+    async def latch_lock(self) -> None:
         """
         Locks the provided lock
         """
@@ -242,7 +242,7 @@ class LoqedStatusClient:
         self._session = session
         self._ip_address = ip_address
 
-    async def get_lock_status(self, lock_id) -> dict[str, str]:
+    async def get_lock_status(self) -> dict[str, str]:
         """
         Gets the status of the provided lock
         """

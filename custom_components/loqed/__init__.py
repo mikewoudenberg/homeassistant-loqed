@@ -76,12 +76,12 @@ async def ensure_webhooks(
     webhook_url = webhook.async_generate_url(hass, webhook_id)
     _LOGGER.info("Webhook URL: %s", webhook_url)
 
-    webhooks = await webhook_client.get_all_webhooks("")
+    webhooks = await webhook_client.get_all_webhooks()
     webhook_index = next((x["id"] for x in webhooks if x["url"] == webhook_url), None)
 
     if not webhook_index:
-        await webhook_client.setup_webhook("", webhook_url, WEBHOOK_ALL_EVENTS_FLAG)
-        webhooks = await webhook_client.get_all_webhooks("")
+        await webhook_client.setup_webhook(webhook_url, WEBHOOK_ALL_EVENTS_FLAG)
+        webhooks = await webhook_client.get_all_webhooks()
         webhook_index = next(x["id"] for x in webhooks if x["url"] == webhook_url)
 
         _LOGGER.info("Webhook got index %s", webhook_index)
@@ -129,7 +129,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     webhook.async_unregister(hass, entry.data[CONF_WEBHOOK_ID])
     client: LoqedWebhookClient = hass.data[DOMAIN][CONF_WEBHOOK_CLIENT]
 
-    await client.remove_webhook("", hass.data[DOMAIN][CONF_WEBHOOK_INDEX])
+    await client.remove_webhook(hass.data[DOMAIN][CONF_WEBHOOK_INDEX])
 
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN] = None
@@ -154,6 +154,6 @@ class LoqedDataCoordinator(DataUpdateCoordinator):
         """Fetch data from API endpoint."""
         try:
             async with async_timeout.timeout(10):
-                return await self.status_client.get_lock_status("")
+                return await self.status_client.get_lock_status()
         except LoqedException as err:
             raise ConfigEntryAuthFailed from err

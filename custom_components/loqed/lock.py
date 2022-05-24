@@ -102,21 +102,21 @@ class LoqedLock(CoordinatorEntity[LoqedDataCoordinator], LockEntity):
         self._state = STATE_LOCKING
         self.async_write_ha_state()
 
-        await self._client.lock_lock("")
+        await self._client.lock_lock()
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Unlock the lock."""
         self._state = STATE_UNLOCKING
         self.async_write_ha_state()
 
-        await self._client.latch_lock("")
+        await self._client.latch_lock()
 
     async def async_open(self, **kwargs: Any) -> None:
         """Open the door latch."""
         self._state = STATE_UNLOCKING
         self.async_write_ha_state()
 
-        await self._client.open_lock("")
+        await self._client.open_lock()
 
     @callback
     def _handle_coordinator_update(self) -> None:
