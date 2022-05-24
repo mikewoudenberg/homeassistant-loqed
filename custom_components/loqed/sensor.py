@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import LoqedDataCoordinator
-from .const import DOMAIN
+from .const import CONF_COORDINATOR, DOMAIN
 
 SENSORS: list[SensorEntityDescription] = [
     SensorEntityDescription(
@@ -48,7 +48,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Loqed sensor."""
-    coordinator: LoqedDataCoordinator = hass.data[DOMAIN]["coordinator"]
+    coordinator: LoqedDataCoordinator = hass.data[DOMAIN][CONF_COORDINATOR]
 
     entities = [
         LoqedSensor(entry.data[CONF_MAC], sensor, coordinator) for sensor in SENSORS

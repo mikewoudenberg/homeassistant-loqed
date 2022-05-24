@@ -1,7 +1,6 @@
 """Config flow for Loqed integration."""
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import voluptuous as vol
@@ -25,8 +24,6 @@ from .const import (
     DOMAIN,
 )
 from .loqed import LoqedStatusClient
-
-_LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -81,11 +78,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             info = await validate_input(self.hass, user_input)
         except CannotConnect:
             errors["base"] = "cannot_connect"
-        except InvalidAuth:
-            errors["base"] = "invalid_auth"
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.exception("Unexpected exception")
-            errors["base"] = "unknown"
         else:
             await self.async_set_unique_id(info[CONF_MAC])
             self._abort_if_unique_id_configured()

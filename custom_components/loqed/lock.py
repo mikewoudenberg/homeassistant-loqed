@@ -22,7 +22,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import LoqedDataCoordinator
-from .const import DOMAIN
+from .const import CONF_COORDINATOR, CONF_LOCK_CLIENT, DOMAIN
 from .loqed import LoqedLockClient
 
 LOCK_UNLOCK_DELAY = 2
@@ -44,10 +44,12 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Loqed sensor."""
-    coordinator: LoqedDataCoordinator = hass.data[DOMAIN]["coordinator"]
+    coordinator: LoqedDataCoordinator = hass.data[DOMAIN][CONF_COORDINATOR]
 
     entities = [
-        LoqedLock(entry.data[CONF_MAC], hass.data[DOMAIN]["lock_client"], coordinator)
+        LoqedLock(
+            entry.data[CONF_MAC], hass.data[DOMAIN][CONF_LOCK_CLIENT], coordinator
+        )
     ]
     async_add_entities(entities)
 
@@ -113,6 +115,7 @@ class LoqedLock(CoordinatorEntity[LoqedDataCoordinator], LockEntity):
         """Open the door latch."""
         self._state = STATE_UNLOCKING
         self.async_write_ha_state()
+
         await self._client.open_lock("")
 
     @callback

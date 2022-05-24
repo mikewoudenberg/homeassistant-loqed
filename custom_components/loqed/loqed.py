@@ -67,7 +67,7 @@ class LoqedWebhookClient:
         Sets up a webhook for the given lock. Enables all events and calls the callbackUrl
         """
         now = _now_as_timestamp()
-        signature = self._generate_signature(
+        signature = self.generate_signature(
             callback_url.encode() + flags.to_bytes(4, "big"), now
         )
         result = await self._session.post(
@@ -97,7 +97,7 @@ class LoqedWebhookClient:
         Removes a webhook for the given lock.
         """
         now = _now_as_timestamp()
-        signature = self._generate_signature(webhook_id.to_bytes(8, "big"), now)
+        signature = self.generate_signature(webhook_id.to_bytes(8, "big"), now)
         result = await self._session.delete(
             f"http://{self._ip_address}/webhooks/{webhook_id}",
             timeout=self._timeout,
@@ -113,7 +113,7 @@ class LoqedWebhookClient:
         Returns all webhooks
         """
         now = _now_as_timestamp()
-        signature = self._generate_signature(bytes(), now)
+        signature = self.generate_signature(bytes(), now)
         result = await self._session.get(
             f"http://{self._ip_address}/webhooks",
             timeout=self._timeout,
@@ -135,7 +135,7 @@ class LoqedWebhookClient:
         Validates the given body to have come from the configured bridge
         """
 
-        calculated_hash = self._generate_signature(body.encode(), timestamp)
+        calculated_hash = self.generate_signature(body.encode(), timestamp)
 
         now = _now_as_timestamp()
 
@@ -144,7 +144,7 @@ class LoqedWebhookClient:
             or timestamp in range(now - ALLOWED_DRIFT, now + ALLOWED_DRIFT)
         )
 
-    def _generate_signature(self, body: bytes, timestamp: int):
+    def generate_signature(self, body: bytes, timestamp: int):
         """
         Returns the signature for the requested message
         """
@@ -193,7 +193,7 @@ class LoqedLockClient:
         )
         result.raise_for_status()
 
-    def _get_command(self, action: ActionType):
+    def _get_command(self, action: ActionType) -> str:
         """
         Generates a signed comamnd string that can be sent to the lock securely
         """

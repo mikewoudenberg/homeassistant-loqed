@@ -24,7 +24,13 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.network import get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import (
+    CONF_COORDINATOR,
+    CONF_LOCK_CLIENT,
+    CONF_WEBHOOK_CLIENT,
+    CONF_WEBHOOK_INDEX,
+    DOMAIN,
+)
 from .loqed import (
     WEBHOOK_ALL_EVENTS_FLAG,
     LoqedException,
@@ -37,7 +43,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.LOCK]
 _LOGGER = logging.getLogger(__name__)
 
 
-async def handle_webhook(hass: HomeAssistant, _: str, request: Request):
+async def handle_webhook(hass: HomeAssistant, _: str, request: Request) -> None:
     """
     Handles incoming Loqed messages
     """
@@ -47,7 +53,7 @@ async def handle_webhook(hass: HomeAssistant, _: str, request: Request):
     message_hash = request.headers.get("hash", "")
 
     body = await request.text()
-    client: LoqedWebhookClient = hass.data[DOMAIN]["client"]
+    client: LoqedWebhookClient = hass.data[DOMAIN][CONF_WEBHOOK_CLIENT]
 
     valid = client.validate_message(body, int(timestamp), message_hash, True)
     if not valid:
@@ -108,10 +114,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_CLIENT_SECRET],
     )
 
-    entry_config["client"] = webhook_client
-    entry_config["lock_client"] = lock_client
-    entry_config["webhook_id"] = webhook_index
-    entry_config["coordinator"] = coordinator
+    entry_config[CONF_WEBHOOK_CLIENT] = webhook_client
+    entry_config[CONF_LOCK_CLIENT] = lock_client
+    entry_config[CONF_WEBHOOK_INDEX] = webhook_index
+    entry_config[CONF_COORDINATOR] = coordinator
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 
@@ -121,9 +127,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     webhook.async_unregister(hass, entry.data[CONF_WEBHOOK_ID])
-    client: LoqedWebhookClient = hass.data[DOMAIN]["client"]
+    client: LoqedWebhookClient = hass.data[DOMAIN][CONF_WEBHOOK_CLIENT]
 
-    await client.remove_webhook("", hass.data[DOMAIN]["webhook_id"])
+    await client.remove_webhook("", hass.data[DOMAIN][CONF_WEBHOOK_INDEX])
 
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN] = None
@@ -144,7 +150,7 @@ class LoqedDataCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name="Loqed sensors")
         self.status_client = status_client
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> dict[str, str]:
         """Fetch data from API endpoint."""
         try:
             async with async_timeout.timeout(10):
