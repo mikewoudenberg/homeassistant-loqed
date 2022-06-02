@@ -1,13 +1,11 @@
 {
   "config": {
+    "flow_title": "LOQED Touch Smartlock setup ({host})",
     "step": {
       "user": {
-        "description": "The Loqed integration uses a combination of a webhook and connection to the bridge",
+        "description": "Visit {config_url} and: <BR/>* Create an API-key: [add new api-key] <BR/>* Copy the [Integration information] value by clicking on the copy button in the detail-page of the just created API-key.",
         "data": {
-          "ip_address": "[%key:common::config_flow::data::ip%]",
-          "api_key": "[%key:common::config_flow::data::api_key%]",
-          "client_secret": "Incoming webhook API key",
-          "client_id": "Incoming webhook API key local key id"
+          "config": "Loqed Configuration copied from the API setup page"
         }
       }
     },

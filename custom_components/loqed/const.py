@@ -1,8 +1,7 @@
-"""Constants for the Loqed integration."""
+"""Constants for the loqed integration."""
+
 
 DOMAIN = "loqed"
-
-CONF_WEBHOOK_CLIENT = "webhook_client"
-CONF_LOCK_CLIENT = "lock_client"
 CONF_WEBHOOK_INDEX = "webhook_index"
 CONF_COORDINATOR = "coordinator"
+CONF_LOCK = "lock"

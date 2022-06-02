@@ -1,87 +1,69 @@
-"""The Loqed integration."""
+"""The loqed integration."""
 from __future__ import annotations
 
-import json
 import logging
 
 from aiohttp.web import Request
 import async_timeout
+from loqedAPI import loqed
 
 from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_API_KEY,
-    CONF_CLIENT_ID,
-    CONF_CLIENT_SECRET,
-    CONF_IP_ADDRESS,
-    CONF_WEBHOOK_ID,
-    Platform,
-)
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.const import CONF_WEBHOOK_ID, Platform
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.network import get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import (
-    CONF_COORDINATOR,
-    CONF_LOCK_CLIENT,
-    CONF_WEBHOOK_CLIENT,
-    CONF_WEBHOOK_INDEX,
-    DOMAIN,
-)
-from .loqed import (
-    WEBHOOK_ALL_EVENTS_FLAG,
-    LoqedException,
-    LoqedLockClient,
-    LoqedStatusClient,
-    LoqedWebhookClient,
-)
+from .const import CONF_COORDINATOR, CONF_LOCK, CONF_WEBHOOK_INDEX, DOMAIN
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.LOCK]
+PLATFORMS: list[str] = [Platform.LOCK, Platform.SENSOR]
+
+
 _LOGGER = logging.getLogger(__name__)
 
 
-async def handle_webhook(hass: HomeAssistant, _: str, request: Request) -> None:
-    """
-    Handles incoming Loqed messages
-    """
-    _LOGGER.debug("Received request %s", request.headers)
-
-    timestamp = request.headers.get("timestamp", "0")
-    message_hash = request.headers.get("hash", "")
-
+@callback
+async def _handle_webhook(
+    hass: HomeAssistant, webhook_id: str, request: Request
+) -> None:
+    """Handle incoming Loqed messages."""
+    _LOGGER.debug("Callback received: %s", str(request.headers))
+    received_ts = request.headers["TIMESTAMP"]
+    received_hash = request.headers["HASH"]
     body = await request.text()
-    client: LoqedWebhookClient = hass.data[DOMAIN][CONF_WEBHOOK_CLIENT]
 
-    valid = client.validate_message(body, int(timestamp), message_hash, True)
-    if not valid:
-        _LOGGER.debug("Received invalid message: %s", body)
+    _LOGGER.debug("Callback body: %s", body)
+
+    entry = next(
+        entry
+        for entry in hass.data[DOMAIN].values()
+        if entry[CONF_WEBHOOK_ID] == webhook_id
+    )
+    lock: loqed.Lock = entry[CONF_LOCK]
+    coordinator: LoqedDataCoordinator = entry[CONF_COORDINATOR]
+
+    event_data = await lock.receiveWebhook(body, received_hash, received_ts)
+    if "error" in event_data:
+        _LOGGER.warning("Incorrect callback received:: %s", event_data)
         return
 
-    message = json.loads(body)
-    coordinator: LoqedDataCoordinator = hass.data[DOMAIN]["coordinator"]
-    coordinator.async_set_updated_data(message)
+    coordinator.async_set_updated_data(event_data)
 
 
-async def ensure_webhooks(
-    hass: HomeAssistant, webhook_id: str, webhook_client: LoqedWebhookClient
+async def _ensure_webhooks(
+    hass: HomeAssistant, webhook_id: str, lock: loqed.Lock
 ) -> int:
-    """
-    Ensures the existence of the webhooks on both sides
-    """
-
-    webhook.async_register(hass, DOMAIN, "Loqed", webhook_id, handle_webhook)
+    webhook.async_register(hass, DOMAIN, "Loqed", webhook_id, _handle_webhook)
     webhook_url = webhook.async_generate_url(hass, webhook_id)
     _LOGGER.info("Webhook URL: %s", webhook_url)
 
-    webhooks = await webhook_client.get_all_webhooks()
+    webhooks = await lock.getWebhooks()
+
     webhook_index = next((x["id"] for x in webhooks if x["url"] == webhook_url), None)
 
     if not webhook_index:
-        await webhook_client.setup_webhook(webhook_url, WEBHOOK_ALL_EVENTS_FLAG)
-        webhooks = await webhook_client.get_all_webhooks()
+        await lock.registerWebhook(webhook_url)
+        webhooks = await lock.getWebhooks()
         webhook_index = next(x["id"] for x in webhooks if x["url"] == webhook_url)
 
         _LOGGER.info("Webhook got index %s", webhook_index)
@@ -90,70 +72,62 @@ async def ensure_webhooks(
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Loqed from a config entry."""
-    _LOGGER.debug("Current domain: %s", hass.data.get(DOMAIN, ""))
-    entry_config = hass.data.setdefault(DOMAIN, {})
-
+    """Set up loqed from a config entry."""
     websession = async_get_clientsession(hass)
-    status_client = LoqedStatusClient(websession, entry.data[CONF_IP_ADDRESS])
-    coordinator = LoqedDataCoordinator(hass, status_client)
+    host = entry.data["host"]
+    apiclient = loqed.APIClient(websession, f"http://{host}")
+    api = loqed.LoqedAPI(apiclient)
+
+    lock = await api.async_get_lock(
+        entry.data["api_key"],
+        entry.data["bkey"],
+        entry.data["key_id"],
+        entry.data["host"],
+    )
+    webhook_id = entry.data[CONF_WEBHOOK_ID]
+    webhook_index = await _ensure_webhooks(hass, webhook_id, lock)
+    coordinator = LoqedDataCoordinator(hass, api)
     await coordinator.async_config_entry_first_refresh()
 
-    webhook_id = entry.data[CONF_WEBHOOK_ID]
-
-    webhook_client = LoqedWebhookClient(
-        websession, entry.data[CONF_IP_ADDRESS], entry.data[CONF_API_KEY]
-    )
-
-    webhook_index = await ensure_webhooks(hass, webhook_id, webhook_client)
-
-    lock_client = LoqedLockClient(
-        websession,
-        entry.data[CONF_IP_ADDRESS],
-        entry.data[CONF_CLIENT_ID],
-        entry.data[CONF_CLIENT_SECRET],
-    )
-
-    entry_config[CONF_WEBHOOK_CLIENT] = webhook_client
-    entry_config[CONF_LOCK_CLIENT] = lock_client
-    entry_config[CONF_WEBHOOK_INDEX] = webhook_index
-    entry_config[CONF_COORDINATOR] = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        CONF_WEBHOOK_ID: webhook_id,
+        CONF_LOCK: lock,
+        CONF_COORDINATOR: coordinator,
+        CONF_WEBHOOK_INDEX: webhook_index,
+    }
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
-
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    webhook.async_unregister(hass, entry.data[CONF_WEBHOOK_ID])
-    client: LoqedWebhookClient = hass.data[DOMAIN][CONF_WEBHOOK_CLIENT]
+    data = hass.data[DOMAIN][entry.entry_id]
+    webhook.async_unregister(hass, data[CONF_WEBHOOK_ID])
+    lock: loqed.Lock = data[CONF_LOCK]
 
-    await client.remove_webhook(hass.data[DOMAIN][CONF_WEBHOOK_INDEX])
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
 
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN] = None
+    try:
+        await lock.deleteWebhook(data[CONF_WEBHOOK_INDEX])
+    except Exception:  # pylint: disable=broad-except
+        _LOGGER.exception("Failed to delete webhook")
+        return False
 
     return unload_ok
 
 
 class LoqedDataCoordinator(DataUpdateCoordinator):
-    """
-    Data update coordinator for the loqed platform
-    """
+    """Data update coordinator for the loqed platform."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        status_client: LoqedStatusClient,
-    ) -> None:
+    def __init__(self, hass: HomeAssistant, api: loqed.LoqedAPI) -> None:
+        """Initialize the Loqed Data Update coordinator."""
         super().__init__(hass, _LOGGER, name="Loqed sensors")
-        self.status_client = status_client
+        self._api = api
 
     async def _async_update_data(self) -> dict[str, str]:
         """Fetch data from API endpoint."""
-        try:
-            async with async_timeout.timeout(10):
-                return await self.status_client.get_lock_status()
-        except LoqedException as err:
-            raise ConfigEntryAuthFailed from err
+        async with async_timeout.timeout(10):
+            return await self._api.async_get_lock_details()

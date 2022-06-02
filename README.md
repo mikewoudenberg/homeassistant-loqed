@@ -19,7 +19,7 @@ The `Loqed` component is a Home Assistant custom component for integrating your 
 
 ## Configuration
 
-### ip address and API tokens
+### Integration configuration
 
 Creating an API Key (from [Loqed support](https://support.loqed.com/en/articles/6127856-loqed-local-bridge-api-integration))
 First you need to create a new key on your LOQED Touch Smart Lock.
@@ -40,7 +40,8 @@ Click "Add API key".
 
 ![Step 3](./images/FAQ_Webhooks_4_Copy_Webhook_URL.png)
 
-You have now created the API key. Go to edit to copy the key id and the secret
+You have now created the API key. Go to edit and click on the `Copy` button in the Integration configuration section
+![Step 4](./images/FAQ_Webhooks_5_Copy_Integration_information.png)
 
 ## State and attributes
 

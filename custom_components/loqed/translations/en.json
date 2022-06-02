@@ -1,22 +1,20 @@
 {
     "config": {
+        "flow_title": "LOQED Touch Smartlock setup ({host})",
         "abort": {
             "already_configured": "Device is already configured"
         },
         "error": {
-            "cannot_connect": "Failed to connect",
+            "cannot_connect": "Failed to connect, did you copy the complete string with the copy button?",
             "invalid_auth": "Invalid authentication",
             "unknown": "Unexpected error"
         },
         "step": {
             "user": {
-                "description": "The Loqed integration uses a combination of a webhook and connection to the bridge",
                 "data": {
-                    "ip_address": "Ip adress of bridge",
-                    "api_key": "Api key of bridge",
-                    "client_secret": "Incoming webhook API key",
-                    "client_id": "Incoming webhook API key local key id"
-                }
+                    "config": "Lock-details: [Integration information] in the api-key details"
+                },
+                "description": "Visit {config_url} and: <BR/>* Create an API-key: [add new api-key] <BR/>* Copy the [Integration information] value by clicking on the copy button in the detail-page of the just created API-key."
             }
         }
     }
