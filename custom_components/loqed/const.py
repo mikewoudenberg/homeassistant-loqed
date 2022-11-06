@@ -2,6 +2,5 @@
 
 
 DOMAIN = "loqed"
-CONF_WEBHOOK_INDEX = "webhook_index"
-CONF_COORDINATOR = "coordinator"
-CONF_LOCK = "lock"
+OAUTH2_AUTHORIZE = "https://app.loqed.com/API/integration_oauth2/login.php"
+OAUTH2_TOKEN = "https://app.loqed.com/API/integration_oauth2/token.php"
