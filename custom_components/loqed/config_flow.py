@@ -49,7 +49,7 @@ class ConfigFlow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMA
         session = async_get_clientsession(self.hass)
         res = await session.request(
             "GET",
-            "https://app.loqed.com/API/integration_oauth2/retrieve_temp_data.php",
+            "https://app.loqed.com/API/integration_oauth2/retrieve_lock_data.php",
             headers={"Authorization": f"Bearer {data['token']['access_token']}"},
         )
 
