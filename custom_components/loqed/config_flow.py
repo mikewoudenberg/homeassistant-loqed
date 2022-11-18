@@ -5,8 +5,9 @@ import logging
 
 from loqedAPI import loqed
 
+from homeassistant.components import webhook
 from homeassistant.components.zeroconf import ZeroconfServiceInfo
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, CONF_WEBHOOK_ID
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -53,6 +54,10 @@ class ConfigFlow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMA
             headers={"Authorization": f"Bearer {data['token']['access_token']}"},
         )
 
-        config = data | await res.json(content_type="text/html")
+        config = (
+            data
+            | {CONF_WEBHOOK_ID: webhook.async_generate_id()}
+            | await res.json(content_type="text/html")
+        )
 
         return self.async_create_entry(title=self.flow_impl.name, data=config)

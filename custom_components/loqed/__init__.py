@@ -27,9 +27,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = loqed.LoqedAPI(apiclient)
 
     lock = await api.async_get_lock(
-        entry.data["api_key"],
-        entry.data["bkey"],
-        entry.data["key_id"],
+        entry.data["lock_key_key"],
+        entry.data["bridge_key"],
+        entry.data["lock_key_local_id"],
         entry.data["bridge_ip"],
     )
     coordinator = LoqedDataCoordinator(hass, api, lock, entry)
