@@ -29,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     lock = await api.async_get_lock(
         entry.data["lock_key_key"],
         entry.data["bridge_key"],
-        entry.data["lock_key_local_id"],
+        int(entry.data["lock_key_local_id"]),
         entry.data["bridge_ip"],
     )
     coordinator = LoqedDataCoordinator(hass, api, lock, entry)
@@ -49,10 +49,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
 
-    try:
-        await coordinator.remove_webhooks()
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Failed to delete webhook")
-        return False
+    await coordinator.remove_webhooks()
 
     return unload_ok
