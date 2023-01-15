@@ -56,12 +56,12 @@ class ConfigFlow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMA
         )
         lock_data = await res.json(content_type="text/html")
 
-        await self.async_set_unique_id(re.sub(r'LOQED-([a-f0-9]+)\.local',r'\1',lock_data["bridge_mdns_hostname"]))
-
-        config = (
-            data
-            | {CONF_WEBHOOK_ID: webhook.async_generate_id()}
-            | lock_data
+        await self.async_set_unique_id(
+            re.sub(
+                r"LOQED-([a-f0-9]+)\.local", r"\1", lock_data["bridge_mdns_hostname"]
+            )
         )
+
+        config = data | {CONF_WEBHOOK_ID: webhook.async_generate_id()} | lock_data
 
         return self.async_create_entry(title=self.flow_impl.name, data=config)
