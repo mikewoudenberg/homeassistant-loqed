@@ -1,6 +1,15 @@
-# Loqed
+# LOQED
 
-The `Loqed` component is a Home Assistant custom component for integrating your [Loqed](https://loqed.com/) smart lock
+Integrate your LOQED Touch Smart Lock with Home Assistant. The lock instantly notifies Home Assistant of a lock state change and you can change the lock state yourself.
+
+## Features
+
+This integration supports:
+
+- Detection of locks through zeroconf
+- Send real-time status changes of the lock (open, unlock, lock)
+- Change the lock state (open, unlock, lock).
+  - Only if your lock has a fixed knob on the outside of your door, you can use the “open” lock state. If you do not have this (thus you have a handle on the outside of your door that you can push down), this command will behave as if the unlock command is sent.
 
 ## Installation
 
@@ -8,44 +17,60 @@ The `Loqed` component is a Home Assistant custom component for integrating your 
 
 1. Copy the `loqed` folder into your custom_components folder in your hass configuration directory.
 2. Restart Home Assistant.
-3. Configure your Loqed lock through Configuration -> Integrations -> Add Integration.
+3. Configure your LOQED lock through Configuration -> Integrations -> Add Integration.
 
 ### Installation with HACS (Home Assistant Community Store)
 
 1. Ensure that [HACS](https://hacs.xyz/) is installed.
 2. Search for and install the `Loqed` integration through HACS.
 3. Restart Home Assistant.
-4. Configure Loqed through Configuration -> Integrations -> Add Integration.
+4. Configure LOQED through Configuration -> Integrations -> Add Integration.
 
-## Configuration
+## Prerequisites
 
-### Integration configuration
+On the [LOQED web-app](https://app.loqed.com/API-Config/), please follow the following steps:
 
-Creating an API Key (from [Loqed support](https://support.loqed.com/en/articles/6127856-loqed-local-bridge-api-integration))
-First you need to create a new key on your LOQED Touch Smart Lock.
+{% details "Generate Client ID and Client Secret" %}
 
-Open the page https://app.loqed.com/API-Config.
+1. Login with your LOQED App e-mail address (you need to be admin)
+2. Tap “API Configuration tool”
+3. Tap “Add new ClientId/Client Secret pair”
+4. Store the ClientId and Client Secret somewhere you can easily copy/paste from as you'll need them in the next step
+   {% enddetails %}
 
-Log in using your email address and password that you use for logging into the LOQED app.
+{% include integrations/config_flow.md %}
 
-![Step 1](./images/FAQ_Webhooks_2_Add_API_Key.png)
-Click on "Add new API key".
+The integration setup will next give you instructions to enter the [Application Credentials](/integrations/application_credentials/) (OAuth Client ID and Client Secret) and authorize Home Assistant to access your account and lock(s).
 
-![Step 2](./images/FAQ_Webhooks_3_Name_API_Key.png)
-Enter a name for easy identification. This can be anything you like.
+{% details "OAuth and Device Authorization steps" %}
 
-If you have multiple locks, you can select the right lock in the dropdown menu right next to "Select Lock".
+1. The first step shows a login page
 
-Click "Add API key".
+2. Login with your (admin) LOQED credentials
 
-![Step 3](./images/FAQ_Webhooks_4_Copy_Webhook_URL.png)
+3. LOQED will now ask you which Lock you want to setup. Select the one you want to setup
 
-You have now created the API key. Go to edit and click on the `Copy` button in the Integration configuration section
-![Step 4](./images/FAQ_Webhooks_5_Copy_Integration_information.png)
+4. Either create an API key or use an existing one
 
-## State and attributes
+5. Click `Finish` to return to Home Assistant
 
-**TODO**
+6. You may close the window, and return back to Home Assistant where you should see a _Success!_ message from Home Assistant.
+
+{% enddetails %}
+
+## Services
+
+Please see the default [lock integration page](/integrations/lock/) for the services available for the lock.
+
+## De-installation in Loqed
+
+First remove the integration from Home Assistant. This will take care of removing any configuration made on the lock itself for Home Assistant.
+
+On [LOQED web-app](https://app.loqed.com/API-Config/), please follow the following steps:
+
+- Login with your LOQED App e-mail address (you need to be admin)
+- Tap “API Configuration tool”
+- Delete the Client Id / Client Secret pair you created for this integration.
 
 ## Debugging
 
@@ -55,5 +80,5 @@ It is possible to debug log the webhook calls and raw responses from the bridge 
 logger:
   default: info
   logs:
-    homeassistant.components.loqed: debug
+    custom_components.loqed: debug
 ```

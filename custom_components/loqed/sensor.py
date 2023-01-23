@@ -30,7 +30,7 @@ SENSORS: Final[tuple[SensorEntityDescription, ...]] = (
     ),
     SensorEntityDescription(
         key="battery_percentage",
-        name="Battery strength",
+        name="Battery level",
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
