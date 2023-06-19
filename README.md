@@ -22,9 +22,10 @@ This integration supports:
 ### Installation with HACS (Home Assistant Community Store)
 
 1. Ensure that [HACS](https://hacs.xyz/) is installed.
-2. Search for and install the `Loqed` integration through HACS. (add this repository as a custom repository)
-3. Restart Home Assistant.
-4. Configure LOQED through Configuration -> Integrations -> Add Integration.
+2. Add this repository as a custom repository via [this guide](https://hacs.xyz/docs/faq/custom_repositories/)
+3. Search for Loqed (it should now find the integration from this repository)
+4. Restart Home Assistant.
+5. Configure LOQED through Configuration -> Integrations -> Add Integration.
 
 ## Prerequisites
 
