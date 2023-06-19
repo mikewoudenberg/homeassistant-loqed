@@ -30,16 +30,11 @@ This integration supports:
 
 On the [LOQED personal access token website](https://integrations.production.loqed.com/personal-access-tokens), please follow the following steps:
 
-{% details "Generate access token" %}
-
 1. Login with your LOQED App e-mail address (you need to be admin)
 2. Tap on "Create"
 3. Give your personal access token a name (this will not be used further on, but we recommend something like "Home Assistant" to be able to recognize it as used by Home Assistant)
 4. Tap on Save
 5. Store the access token somewhere you can easily copy/paste from as you'll need them in the next step (and it will only be shown once). Note that you can use this token for setting up multiple locks.
-   {% enddetails %}
-
-{% include integrations/config_flow.md %}
 
 Home Assistant should automatically detect your lock when your Home Assistant runs on the same network as your lock. In that case you only need to provide the selected API key when you configure the integration.
 
