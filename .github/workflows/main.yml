@@ -1,0 +1,19 @@
+name: Home Assistant LOQED custom component
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  hacs:
+    name: HACS Actions
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: HACS Action
+        uses: "hacs/action@22.5.0"
+        with:
+          category: "integration"
+      - uses: "actions/checkout@v3"
+      - uses: "home-assistant/actions/hassfest@master"
