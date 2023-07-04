@@ -8,8 +8,8 @@ from loqedAPI import loqed
 
 from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_WEBHOOK_ID
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import CONF_NAME, CONF_WEBHOOK_ID
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.network import get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -80,17 +80,16 @@ class LoqedDataCoordinator(DataUpdateCoordinator[StatusMessage]):
     ) -> None:
         """Initialize the Loqed Data Update coordinator."""
         super().__init__(hass, _LOGGER, name="Loqed sensors")
-        self._hass = hass
         self._api = api
         self._entry = entry
         self.lock = lock
+        self.device_name = self._entry.data[CONF_NAME]
 
     async def _async_update_data(self) -> StatusMessage:
         """Fetch data from API endpoint."""
         async with async_timeout.timeout(10):
             return await self._api.async_get_lock_details()
 
-    @callback
     async def _handle_webhook(
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:

@@ -1,27 +1,29 @@
 """Creates LOQED sensors."""
 from typing import Final
 
-from .coordinator import LoqedDataCoordinator, StatusMessage
-from .entity import LoqedEntity
-
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
-    SensorDeviceClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+from homeassistant.const import (
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+)
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import LoqedDataCoordinator, StatusMessage
+from .entity import LoqedEntity
 
 SENSORS: Final[tuple[SensorEntityDescription, ...]] = (
     SensorEntityDescription(
         key="ble_strength",
-        name="Bluetooth signal",
+        translation_key="ble_strength",
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -30,9 +32,9 @@ SENSORS: Final[tuple[SensorEntityDescription, ...]] = (
     ),
     SensorEntityDescription(
         key="battery_percentage",
-        name="Battery level",
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
         native_unit_of_measurement=PERCENTAGE,
     ),
 )
@@ -44,24 +46,19 @@ async def async_setup_entry(
     """Set up the Loqed lock platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities(LoqedSensor(coordinator, sensor, entry) for sensor in SENSORS)
+    async_add_entities(LoqedSensor(coordinator, sensor) for sensor in SENSORS)
 
 
 class LoqedSensor(LoqedEntity, SensorEntity):
     """Representation of Sensor state."""
 
     def __init__(
-        self,
-        coordinator: LoqedDataCoordinator,
-        description: SensorEntityDescription,
-        entry: ConfigEntry,
+        self, coordinator: LoqedDataCoordinator, description: SensorEntityDescription
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self.entry = entry
-
-        self._attr_unique_id = f"{entry.unique_id}_{description.key}"
+        self._attr_unique_id = f"{self.coordinator.lock.id}_{description.key}"
 
     @property
     def data(self) -> StatusMessage:
