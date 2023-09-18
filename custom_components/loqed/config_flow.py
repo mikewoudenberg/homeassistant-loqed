@@ -58,7 +58,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             apiclient = loqed.APIClient(session, f"http://{selected_lock['bridge_ip']}")
             api = loqed.LoqedAPI(apiclient)
             lock = await api.async_get_lock(
-                selected_lock["key_secret"],
+                selected_lock["backend_key"],
                 selected_lock["bridge_key"],
                 selected_lock["local_id"],
                 selected_lock["bridge_ip"],
@@ -123,7 +123,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=user_data_schema,
                 description_placeholders={
-                    "config_url": "https://integrations.production.loqed.com/personal-access-tokens",
+                    "config_url": "https://integrations.loqed.com/personal-access-tokens",
                 },
             )
 
@@ -156,7 +156,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=user_data_schema,
             errors=errors,
             description_placeholders={
-                "config_url": "https://integrations.production.loqed.com/personal-access-tokens",
+                "config_url": "https://integrations.loqed.com/personal-access-tokens",
             },
         )
 
